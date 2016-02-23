@@ -13,8 +13,8 @@
             <WrapPanel x:Name="wrapPanel"  Orientation="Horizontal"/>
         </ScrollViewer>
 
-        <Grid x:Name="showImageGrid" Visibility="Hidden" Background="#33000000" VerticalAlignment="Top">
-            <Canvas x:Name="fullSizeImage" Cursor="Hand" Background="#FF633030" Margin="20,20,80,20"/>
+        <Grid x:Name="showImageGrid" Visibility="Hidden" Background="#33000000">
+            <Canvas x:Name="fullSizeImage" Cursor="Hand" Background="#FF633030" Margin="20,20,80,20" VerticalAlignment="Center"/>
             <Button x:Name="btnNext" Content="Next" HorizontalAlignment="Right" Margin="0,76,10,0" VerticalAlignment="Top" Width="58"/>
             <Button x:Name="btnPrev" Content="Next" HorizontalAlignment="Right" Margin="0,302,10,0" VerticalAlignment="Top" Width="58"/>
             <Button x:Name="btnBloor" Content="Blur" HorizontalAlignment="Right" Margin="0,189,10,0" VerticalAlignment="Top" Width="58" Click="btnBloor_Click"/>

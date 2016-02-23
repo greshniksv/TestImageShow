@@ -52,7 +52,10 @@ namespace WpfApplication1
                 Margin = new Thickness(8),
                 Cursor = Cursors.Hand
             };
-            canvas.MouseLeftButtonUp += (sender, args) =>
+
+            canvas.MouseLeftButtonUp += CanvasOnMouseLeftButtonUp;
+
+            /*canvas.MouseLeftButtonUp += (sender, args) =>
             {
                 Bitmap bitmap = BitmapImage2Bitmap(bitmapImage);
                 var blured = Blur(bitmap, 3);
@@ -62,11 +65,25 @@ namespace WpfApplication1
                 fullSizeImage.Background = imageBrush1;
                 fullSizeImage.Height = fullSizeImage.Width * proportion;
                 showImageGrid.Visibility = Visibility.Visible;
-            };
+            };*/
             wrapPanel.Children.Add(canvas);
         }
 
-        
+        private async void CanvasOnMouseLeftButtonUp(object sender, MouseButtonEventArgs mouseButtonEventArgs)
+        {
+            BitmapImage bitmapImage = (BitmapImage)((ImageBrush)((Canvas)sender).Background).ImageSource;
+            var proportion = bitmapImage.Height / bitmapImage.Width;
+            Bitmap bitmap = BitmapImage2Bitmap(bitmapImage);
+            var blured = await Blur(bitmap, 3);
+            var bitmapImageBlur = ToBitmapImage(blured);
+            ImageBrush imageBrush1 = new ImageBrush();
+            imageBrush1.ImageSource = bitmapImageBlur;
+            fullSizeImage.Background = imageBrush1;
+            fullSizeImage.Height = fullSizeImage.ActualWidth * proportion;
+            showImageGrid.Visibility = Visibility.Visible;
+        }
+
+
         private Bitmap BitmapImage2Bitmap(BitmapImage bitmapImage)
         {
             using (MemoryStream outStream = new MemoryStream())
@@ -101,51 +118,59 @@ namespace WpfApplication1
             showImageGrid.Visibility = Visibility.Hidden;
         }
 
-        private static async Task<Bitmap> Blur(Bitmap image, Int32 blurSize)
+        private static async Task<System.Drawing.Bitmap> Blur(Bitmap image, Int32 blurSize)
         {
             Bitmap blurred = new Bitmap(image.Width, image.Height);
-            System.Drawing.Rectangle rectangle = new System.Drawing.Rectangle(0, 0, image.Width, image.Height);
-            // make an exact copy of the bitmap provided
-            using (Graphics graphics = Graphics.FromImage(blurred))
-                graphics.DrawImage(image, new System.Drawing.Rectangle(0, 0, image.Width, image.Height),
-                    new System.Drawing.Rectangle(0, 0, image.Width, image.Height), GraphicsUnit.Pixel);
-
-            // look at every pixel in the blur rectangle
-            for (Int32 xx = rectangle.X; xx < rectangle.X + rectangle.Width; xx++)
+            await Task.Factory.StartNew(() =>
             {
-                for (Int32 yy = rectangle.Y; yy < rectangle.Y + rectangle.Height; yy++)
+                var rectangle = new System.Drawing.Rectangle(0, 0, image.Width, image.Height);
+                // make an exact copy of the bitmap provided
+                using (Graphics graphics = Graphics.FromImage(blurred))
+                    graphics.DrawImage(image, new System.Drawing.Rectangle(0, 0, image.Width, image.Height),
+                        new System.Drawing.Rectangle(0, 0, image.Width, image.Height), GraphicsUnit.Pixel);
+
+                // look at every pixel in the blur rectangle
+                for (Int32 xx = rectangle.X; xx < rectangle.X + rectangle.Width; xx++)
                 {
-                    Int32 avgR = 0, avgG = 0, avgB = 0;
-                    Int32 blurPixelCount = 0;
-
-                    // average the color of the red, green and blue for each pixel in the
-                    // blur size while making sure you don't go outside the image bounds
-                    for (Int32 x = xx; (x < xx + blurSize && x < image.Width); x++)
+                    for (Int32 yy = rectangle.Y; yy < rectangle.Y + rectangle.Height; yy++)
                     {
-                        for (Int32 y = yy; (y < yy + blurSize && y < image.Height); y++)
+                        Int32 avgR = 0, avgG = 0, avgB = 0;
+                        Int32 blurPixelCount = 0;
+
+                        // average the color of the red, green and blue for each pixel in the
+                        // blur size while making sure you don't go outside the image bounds
+                        for (Int32 x = xx; (x < xx + blurSize && x < image.Width); x++)
                         {
-                            System.Drawing.Color pixel = blurred.GetPixel(x, y);
+                            for (Int32 y = yy; (y < yy + blurSize && y < image.Height); y++)
+                            {
+                                System.Drawing.Color pixel = blurred.GetPixel(x, y);
 
-                            avgR += pixel.R;
-                            avgG += pixel.G;
-                            avgB += pixel.B;
+                                avgR += pixel.R;
+                                avgG += pixel.G;
+                                avgB += pixel.B;
 
-                            blurPixelCount++;
+                                blurPixelCount++;
+                            }
                         }
+
+                        avgR = avgR / blurPixelCount;
+                        avgG = avgG / blurPixelCount;
+                        avgB = avgB / blurPixelCount;
+
+                        // now that we know the average for the blur size, set each pixel to that color
+                        for (Int32 x = xx; x < xx + blurSize && x < image.Width && x < rectangle.Width; x++)
+                            for (Int32 y = yy; y < yy + blurSize && y < image.Height && y < rectangle.Height; y++)
+                                blurred.SetPixel(x, y, System.Drawing.Color.FromArgb(avgR, avgG, avgB));
                     }
-
-                    avgR = avgR / blurPixelCount;
-                    avgG = avgG / blurPixelCount;
-                    avgB = avgB / blurPixelCount;
-
-                    // now that we know the average for the blur size, set each pixel to that color
-                    for (Int32 x = xx; x < xx + blurSize && x < image.Width && x < rectangle.Width; x++)
-                        for (Int32 y = yy; y < yy + blurSize && y < image.Height && y < rectangle.Height; y++)
-                            blurred.SetPixel(x, y, System.Drawing.Color.FromArgb(avgR, avgG, avgB));
                 }
+
             }
+                );
 
             return blurred;
+
         }
+
+
     }
 }
