@@ -21,6 +21,8 @@ namespace WpfApplication1
 			InitializeComponent();
 		}
 
+		#region Window actions
+
 		private void MyScrollViewer_Drop(object sender, DragEventArgs e) {
 			var data = (string[])e.Data.GetData(DataFormats.FileDrop);
 			foreach (var item in data) {
@@ -29,8 +31,7 @@ namespace WpfApplication1
 		}
 
 		void canvas_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) {
-			if (e.ClickCount == 2)
-			{
+			if (e.ClickCount == 2) {
 				Action showAction = () => ShowFullSize((Canvas)sender);
 				Dispatcher.BeginInvoke(showAction);
 			}
@@ -39,7 +40,7 @@ namespace WpfApplication1
 		private void btnBloor_Click(object sender, RoutedEventArgs e) {
 			GaussianBlur();
 		}
-		
+
 		private void showImageGrid_PreviewKeyDown(object sender, KeyEventArgs e) {
 			if (e.Key == Key.Escape) {
 				showImageGrid.Visibility = Visibility.Hidden;
@@ -62,6 +63,29 @@ namespace WpfApplication1
 		private void btnPrev_Click(object sender, RoutedEventArgs e) {
 			PreviousImage();
 		}
+
+		private void Window_SizeChanged(object sender, SizeChangedEventArgs e) {
+			if (_canvases.Count == 0 || showImageGrid.Visibility == Visibility.Hidden) {
+				return;
+			}
+			Canvas canvas = _canvases[_currentCanvasIndex];
+			var bitmapImage = (BitmapImage)((ImageBrush)canvas.Background).ImageSource;
+			var proportionHW = bitmapImage.Height / bitmapImage.Width;
+			var proportionWH = bitmapImage.Width / bitmapImage.Height;
+			double width = showImageGrid.ActualWidth - 120;
+			double height = width * proportionHW;
+
+			if (height > showImageGrid.ActualHeight) {
+				height = showImageGrid.ActualHeight - 10;
+				width = height * proportionWH;
+			}
+			fullSizeImage.Width = width;
+			fullSizeImage.Height = height;
+		}
+
+		#endregion
+
+		#region Methods private
 
 		private async void GaussianBlur() {
 			var bitmapImage = (BitmapImage)((ImageBrush)(fullSizeImage).Background).ImageSource;
@@ -130,33 +154,11 @@ namespace WpfApplication1
 				Cursor = Cursors.Hand
 			};
 			_canvases.Add(canvas);
-
 			canvas.PreviewMouseLeftButtonDown += canvas_PreviewMouseLeftButtonDown;
-
-			//canvas.MouseLeftButtonUp += CanvasOnMouseLeftButtonUp;
 			wrapPanel.Children.Add(canvas);
 		}
 
-		
-
-		private void Window_SizeChanged(object sender, SizeChangedEventArgs e) {
-			if (_canvases.Count == 0 || showImageGrid.Visibility == Visibility.Hidden) {
-				return;
-			}
-			Canvas canvas = _canvases[_currentCanvasIndex];
-			var bitmapImage = (BitmapImage)((ImageBrush)canvas.Background).ImageSource;
-			var proportionHW = bitmapImage.Height / bitmapImage.Width;
-			var proportionWH = bitmapImage.Width / bitmapImage.Height;
-			double width = showImageGrid.ActualWidth - 120;
-			double height = width * proportionHW;
-
-			if (height > showImageGrid.ActualHeight) {
-				height = showImageGrid.ActualHeight - 10;
-				width = height * proportionWH;
-			}
-			fullSizeImage.Width = width;
-			fullSizeImage.Height = height;
-		}
+		#endregion
 
 	}
 }
