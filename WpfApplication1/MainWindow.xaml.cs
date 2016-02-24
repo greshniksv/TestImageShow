@@ -1,176 +1,162 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using Color = System.Windows.Media.Color;
-using Rectangle = System.Windows.Shapes.Rectangle;
 
 namespace WpfApplication1
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
-    public partial class MainWindow : Window
-    {
-        public MainWindow()
-        {
-            InitializeComponent();
-        }
+	/// <summary>
+	/// Interaction logic for MainWindow.xaml
+	/// </summary>
+	public partial class MainWindow : Window
+	{
+		private int _currentCanvasIndex;
+		private readonly List<Canvas> _canvases = new List<Canvas>();
 
-        private void MyScrollViewer_Drop(object sender, DragEventArgs e)
-        {
-            var data = (string[])e.Data.GetData(DataFormats.FileDrop);
-            foreach (var item in data)
-            {
-                AddImage(item);
-            }
-        }
+		public MainWindow() {
+			InitializeComponent();
+		}
 
-        private async void AddImage(string path)
-        {
-            ImageBrush imageBrush = new ImageBrush();
-            var bitmapImage = new BitmapImage(new Uri(path, UriKind.Absolute));
-            imageBrush.ImageSource = bitmapImage;
-            var proportion = bitmapImage.Width / bitmapImage.Height;
-            var canvas = new Canvas
-            {
-                Width = proportion * 150,
-                Height = 150,
-                Background = imageBrush,
-                Margin = new Thickness(8),
-                Cursor = Cursors.Hand
-            };
+		private void MyScrollViewer_Drop(object sender, DragEventArgs e) {
+			var data = (string[])e.Data.GetData(DataFormats.FileDrop);
+			foreach (var item in data) {
+				AddImage(item);
+			}
+		}
 
-            canvas.MouseLeftButtonUp += CanvasOnMouseLeftButtonUp;
+		void canvas_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) {
+			if (e.ClickCount == 2)
+			{
+				Action showAction = () => ShowFullSize((Canvas)sender);
+				Dispatcher.BeginInvoke(showAction);
+			}
+		}
 
-            /*canvas.MouseLeftButtonUp += (sender, args) =>
-            {
-                Bitmap bitmap = BitmapImage2Bitmap(bitmapImage);
-                var blured = Blur(bitmap, 3);
-                var bitmapImageBlur = await ToBitmapImage(blured);
-                ImageBrush imageBrush1 = new ImageBrush();
-                imageBrush1.ImageSource = bitmapImageBlur;
-                fullSizeImage.Background = imageBrush1;
-                fullSizeImage.Height = fullSizeImage.Width * proportion;
-                showImageGrid.Visibility = Visibility.Visible;
-            };*/
-            wrapPanel.Children.Add(canvas);
-        }
+		private void btnBloor_Click(object sender, RoutedEventArgs e) {
+			GaussianBlur();
+		}
+		
+		private void showImageGrid_PreviewKeyDown(object sender, KeyEventArgs e) {
+			if (e.Key == Key.Escape) {
+				showImageGrid.Visibility = Visibility.Hidden;
+			}
+			if (e.Key == Key.Down) {
+				PreviousImage();
+			}
+			if (e.Key == Key.Up) {
+				NextImage();
+			}
+			if (e.Key == Key.B) {
+				GaussianBlur();
+			}
+		}
 
-        private async void CanvasOnMouseLeftButtonUp(object sender, MouseButtonEventArgs mouseButtonEventArgs)
-        {
-            BitmapImage bitmapImage = (BitmapImage)((ImageBrush)((Canvas)sender).Background).ImageSource;
-            var proportion = bitmapImage.Height / bitmapImage.Width;
-            Bitmap bitmap = BitmapImage2Bitmap(bitmapImage);
-            var blured = await Blur(bitmap, 3);
-            var bitmapImageBlur = ToBitmapImage(blured);
-            ImageBrush imageBrush1 = new ImageBrush();
-            imageBrush1.ImageSource = bitmapImageBlur;
-            fullSizeImage.Background = imageBrush1;
-            fullSizeImage.Height = fullSizeImage.ActualWidth * proportion;
-            showImageGrid.Visibility = Visibility.Visible;
-        }
+		private void btnNext_Click(object sender, RoutedEventArgs e) {
+			NextImage();
+		}
 
+		private void btnPrev_Click(object sender, RoutedEventArgs e) {
+			PreviousImage();
+		}
 
-        private Bitmap BitmapImage2Bitmap(BitmapImage bitmapImage)
-        {
-            using (MemoryStream outStream = new MemoryStream())
-            {
-                BitmapEncoder enc = new BmpBitmapEncoder();
-                enc.Frames.Add(BitmapFrame.Create(bitmapImage));
-                enc.Save(outStream);
-                Bitmap bitmap = new Bitmap(outStream);
-                return new Bitmap(bitmap);
-            }
-        }
+		private async void GaussianBlur() {
+			var bitmapImage = (BitmapImage)((ImageBrush)(fullSizeImage).Background).ImageSource;
+			Bitmap bitmap = bitmapImage.ToBitmap();
+			var blured = await ImageEffects.BlurAsync(bitmap, 2);
+			var bitmapImageBlur = blured.ToBitmapImage();
+			var imageBrush = new ImageBrush {
+				ImageSource = bitmapImageBlur
+			};
+			fullSizeImage.Background = imageBrush;
+		}
 
-        public static BitmapImage ToBitmapImage(Bitmap bitmap)
-        {
-            using (var memory = new MemoryStream())
-            {
-                bitmap.Save(memory, ImageFormat.Bmp);
-                memory.Position = 0;
+		private void PreviousImage() {
+			if (_currentCanvasIndex == -1) {
+				throw new Exception("Error in canvas colletion");
+			}
+			if (_canvases.Count > _currentCanvasIndex + 1) {
+				ShowFullSize(_canvases[_currentCanvasIndex + 1]);
+			} else {
+				_currentCanvasIndex = 0;
+				ShowFullSize(_canvases[_currentCanvasIndex]);
+			}
+		}
 
-                var bitmapImage = new BitmapImage();
-                bitmapImage.BeginInit();
-                bitmapImage.StreamSource = memory;
-                bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-                bitmapImage.EndInit();
+		private void NextImage() {
+			if (_currentCanvasIndex == -1) {
+				throw new Exception("Error in canvas colletion");
+			}
+			if (_currentCanvasIndex > 0) {
+				ShowFullSize(_canvases[_currentCanvasIndex - 1]);
+			} else {
+				_currentCanvasIndex = _canvases.Count - 1;
+				ShowFullSize(_canvases[_currentCanvasIndex]);
+			}
+		}
 
-                return bitmapImage;
-            }
-        }
+		private void ShowFullSize(Canvas canvas) {
+			_currentCanvasIndex = _canvases.IndexOf(canvas);
+			var bitmapImage = (BitmapImage)((ImageBrush)canvas.Background).ImageSource;
+			var proportionHW = bitmapImage.Height / bitmapImage.Width;
+			var proportionWH = bitmapImage.Width / bitmapImage.Height;
+			fullSizeImage.Background = canvas.Background;
+			double width = showImageGrid.ActualWidth - 120;
+			double height = width * proportionHW;
 
-        private void btnBloor_Click(object sender, RoutedEventArgs e)
-        {
-            showImageGrid.Visibility = Visibility.Hidden;
-        }
+			if (height > showImageGrid.ActualHeight) {
+				height = showImageGrid.ActualHeight - 10;
+				width = height * proportionWH;
+			}
+			fullSizeImage.Width = width;
+			fullSizeImage.Height = height;
+			showImageGrid.Visibility = Visibility.Visible;
+			showImageGrid.Focus();
+		}
 
-        private static async Task<System.Drawing.Bitmap> Blur(Bitmap image, Int32 blurSize)
-        {
-            Bitmap blurred = new Bitmap(image.Width, image.Height);
-            await Task.Factory.StartNew(() =>
-            {
-                var rectangle = new System.Drawing.Rectangle(0, 0, image.Width, image.Height);
-                // make an exact copy of the bitmap provided
-                using (Graphics graphics = Graphics.FromImage(blurred))
-                    graphics.DrawImage(image, new System.Drawing.Rectangle(0, 0, image.Width, image.Height),
-                        new System.Drawing.Rectangle(0, 0, image.Width, image.Height), GraphicsUnit.Pixel);
+		private void AddImage(string path) {
+			var imageBrush = new ImageBrush();
+			var bitmapImage = new BitmapImage(new Uri(path, UriKind.Absolute));
+			imageBrush.ImageSource = bitmapImage;
+			var proportion = bitmapImage.Width / bitmapImage.Height;
+			var canvas = new Canvas {
+				Width = proportion * 150,
+				Height = 150,
+				Background = imageBrush,
+				Margin = new Thickness(8),
+				Cursor = Cursors.Hand
+			};
+			_canvases.Add(canvas);
 
-                // look at every pixel in the blur rectangle
-                for (Int32 xx = rectangle.X; xx < rectangle.X + rectangle.Width; xx++)
-                {
-                    for (Int32 yy = rectangle.Y; yy < rectangle.Y + rectangle.Height; yy++)
-                    {
-                        Int32 avgR = 0, avgG = 0, avgB = 0;
-                        Int32 blurPixelCount = 0;
+			canvas.PreviewMouseLeftButtonDown += canvas_PreviewMouseLeftButtonDown;
 
-                        // average the color of the red, green and blue for each pixel in the
-                        // blur size while making sure you don't go outside the image bounds
-                        for (Int32 x = xx; (x < xx + blurSize && x < image.Width); x++)
-                        {
-                            for (Int32 y = yy; (y < yy + blurSize && y < image.Height); y++)
-                            {
-                                System.Drawing.Color pixel = blurred.GetPixel(x, y);
+			//canvas.MouseLeftButtonUp += CanvasOnMouseLeftButtonUp;
+			wrapPanel.Children.Add(canvas);
+		}
 
-                                avgR += pixel.R;
-                                avgG += pixel.G;
-                                avgB += pixel.B;
+		
 
-                                blurPixelCount++;
-                            }
-                        }
+		private void Window_SizeChanged(object sender, SizeChangedEventArgs e) {
+			if (_canvases.Count == 0 || showImageGrid.Visibility == Visibility.Hidden) {
+				return;
+			}
+			Canvas canvas = _canvases[_currentCanvasIndex];
+			var bitmapImage = (BitmapImage)((ImageBrush)canvas.Background).ImageSource;
+			var proportionHW = bitmapImage.Height / bitmapImage.Width;
+			var proportionWH = bitmapImage.Width / bitmapImage.Height;
+			double width = showImageGrid.ActualWidth - 120;
+			double height = width * proportionHW;
 
-                        avgR = avgR / blurPixelCount;
-                        avgG = avgG / blurPixelCount;
-                        avgB = avgB / blurPixelCount;
+			if (height > showImageGrid.ActualHeight) {
+				height = showImageGrid.ActualHeight - 10;
+				width = height * proportionWH;
+			}
+			fullSizeImage.Width = width;
+			fullSizeImage.Height = height;
+		}
 
-                        // now that we know the average for the blur size, set each pixel to that color
-                        for (Int32 x = xx; x < xx + blurSize && x < image.Width && x < rectangle.Width; x++)
-                            for (Int32 y = yy; y < yy + blurSize && y < image.Height && y < rectangle.Height; y++)
-                                blurred.SetPixel(x, y, System.Drawing.Color.FromArgb(avgR, avgG, avgB));
-                    }
-                }
-
-            }
-                );
-
-            return blurred;
-
-        }
-
-
-    }
+	}
 }
